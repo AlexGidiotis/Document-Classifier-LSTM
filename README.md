@@ -10,11 +10,19 @@ The embedding space uses the trained word vectors from GoogleNews-vectors-negati
 The model is built using TensorFlow and Keras.
 
 List of dependencies:
-1)numpy
-2)pandas
-3)nltk
-4)sklearn
-5)gensim
-6)keras
-7)tensorfow
-8)csv
+
+1) numpy
+
+2) pandas
+
+3) nltk
+
+4) sklearn
+
+5) gensim
+
+6) keras
+
+7) tensorfow
+
+8) csv
