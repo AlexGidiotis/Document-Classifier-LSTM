@@ -45,6 +45,7 @@ class Corpus(object):
     # Yield one row,target pair per iteration. Each row is an abstract (preprocessed)
 	def __iter__(self):
 		for i,(line,target_list) in enumerate(zip(open(self.in_file),open(self.target_file))):
+            # We train using only the first of possibly multiple classes.
 			yield ' '.join(line.strip().replace('-',' ').split(',')),target_list.strip().split(',')[0]
 
 
@@ -108,7 +109,7 @@ tokenizer.fit_on_texts(X_data)
 X_data = tokenizer.texts_to_sequences(X_data)
 word_index = tokenizer.word_index
 print('Found %s unique tokens' % len(word_index))
-X_data = pad_sequences(X_data, maxlen=MAX_SEQUENCE_LENGTH, padding='pre', truncating='post', dtype='float32')
+X_data = pad_sequences(X_data, maxlen=MAX_SEQUENCE_LENGTH, padding='post', truncating='post', dtype='float32')
 print('Shape of data tensor:', X_data.shape)
 print('Shape of label tensor:', y_data.shape)
 
@@ -116,7 +117,7 @@ print('Shape of label tensor:', y_data.shape)
 # LOad the embeddings. (Requires a lot of memory.) 
 embedding_matrix, nb_words = prepare_embeddings(word_index)
 #======================================================= Split the data into train/val sets =======================================================
-X_train, X_val, y_train, y_val = train_test_split(X_data, y_data, test_size=0.25, random_state=42)
+X_train, X_val, y_train, y_val = train_test_split(X_data, y_data, test_size=0.1, random_state=42)
 
 #============================================================ Build the model =====================================================================
 embedding_layer = Embedding(nb_words,
@@ -125,8 +126,8 @@ embedding_layer = Embedding(nb_words,
         input_length=MAX_SEQUENCE_LENGTH,
         trainable=False)
 
-blstm_layer = Bidirectional(LSTM(250, activation='tanh', recurrent_activation='hard_sigmoid', recurrent_dropout=0.0, dropout=0.5, 
-            kernel_constraint=maxnorm(10), kernel_initializer='glorot_uniform'), merge_mode='concat')
+blstm_layer = Bidirectional(LSTM(300, activation='tanh', recurrent_activation='hard_sigmoid', recurrent_dropout=0.0, dropout=0.2, 
+            kernel_constraint=maxnorm(3), kernel_initializer='glorot_uniform'), merge_mode='concat')
 
 sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
 embedded_sequences = embedding_layer(sequence_input)
@@ -138,12 +139,8 @@ dense_1 = Dense(200, activation='relu', kernel_initializer='glorot_uniform')(den
 
 dense_2 = Dropout(0.5)(dense_1)
 dense_2 = BatchNormalization()(dense_2)
-dense_2 = Dense(170, activation='relu', kernel_initializer='glorot_uniform')(dense_2)
 
-dense_3 = Dropout(0.5)(dense_2)
-dense_3 = BatchNormalization()(dense_3)
-
-preds = Dense(nb_classes, activation='softmax')(dense_3)
+preds = Dense(nb_classes, activation='softmax')(dense_2)
 
 #=========================================================== Train the model ===================================================================
 model = Model(inputs=[sequence_input],
@@ -164,7 +161,7 @@ with open(STAMP + ".json", "w") as json_file:
 
 early_stopping =EarlyStopping(monitor='val_loss', patience=3)
 bst_model_path = STAMP + '.h5'
-model_checkpoint = ModelCheckpoint(bst_model_path, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=True)
+model_checkpoint = ModelCheckpoint(bst_model_path, monitor='val_acc', verbose=1, save_best_only=True, save_weights_only=True)
 
 
 hist = model.fit(X_train, y_train, validation_data=(X_val, y_val),
