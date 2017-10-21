@@ -1,7 +1,7 @@
 # Document-Classifier-LSTM
 A bidirectional LSTM that reads the abstract of a paper and classifies it into 165 different categories from arxiv.
 
-The architecture is still far from optimal. The trained model currently achieves 61% validation accuracy.
+The architecture is still far from optimal. The trained model currently achieves 79% validation accuracy.
 
 I am using 500k paper abstracts from arxiv. In order to download your own data refer to the arxiv OAI api https://arxiv.org/help/bulk_data.
 
