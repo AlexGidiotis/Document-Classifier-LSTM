@@ -1,10 +1,11 @@
+import json
+
+import numpy as np
+import pandas as pd
+
 import gensim
 from gensim import corpora
 from gensim.models import KeyedVectors
-
-import json
-import numpy as np
-import pandas as pd
 
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
@@ -55,7 +56,8 @@ def prepare_embeddings(word_index):
     print('Preparing embedding matrix')
     print('Indexing word vectors')
     # Read the pre-trained embeddings.
-    word2vec = KeyedVectors.load_word2vec_format(EMBEDDING_FILE, binary=True)
+    word2vec = KeyedVectors.load_word2vec_format(EMBEDDING_FILE,
+        binary=True)
     print('Found %s word vectors of word2vec' % len(word2vec.vocab))
 
 
@@ -67,7 +69,8 @@ def prepare_embeddings(word_index):
         if word in word2vec.vocab:
             embedding_matrix[i] = word2vec.word_vec(word)
     # WOrds without embeddings are left with zeros.
-    print('Null word embeddings: %d' % np.sum(np.sum(embedding_matrix, axis=1) == 0))
+    print('Null word embeddings: %d' % np.sum(np.sum(embedding_matrix,
+        axis=1) == 0))
 
 
     return embedding_matrix, nb_words
@@ -100,7 +103,8 @@ print 'Exported class dictionary'
 
 # Prepare the labels for training.
 y_data = np.array([class_dict[y] for y in y_data])
-y_data = to_categorical(y_data, num_classes=nb_classes)
+y_data = to_categorical(y_data,
+    num_classes=nb_classes)
 
 
 # Tokenize and pad text.
@@ -109,7 +113,11 @@ tokenizer.fit_on_texts(X_data)
 X_data = tokenizer.texts_to_sequences(X_data)
 word_index = tokenizer.word_index
 print('Found %s unique tokens' % len(word_index))
-X_data = pad_sequences(X_data, maxlen=MAX_SEQUENCE_LENGTH, padding='post', truncating='post', dtype='float32')
+X_data = pad_sequences(X_data,
+    maxlen=MAX_SEQUENCE_LENGTH,
+    padding='post',
+    truncating='post',
+    dtype='float32')
 print('Shape of data tensor:', X_data.shape)
 print('Shape of label tensor:', y_data.shape)
 
@@ -117,7 +125,9 @@ print('Shape of label tensor:', y_data.shape)
 # LOad the embeddings. (Requires a lot of memory.) 
 embedding_matrix, nb_words = prepare_embeddings(word_index)
 #======================================================= Split the data into train/val sets =======================================================
-X_train, X_val, y_train, y_val = train_test_split(X_data, y_data, test_size=0.1, random_state=42)
+X_train, X_val, y_train, y_val = train_test_split(X_data, y_data,
+    test_size=0.1,
+    random_state=42)
 
 #============================================================ Build the model =====================================================================
 embedding_layer = Embedding(nb_words,
@@ -126,28 +136,38 @@ embedding_layer = Embedding(nb_words,
         input_length=MAX_SEQUENCE_LENGTH,
         trainable=False)
 
-blstm_layer = Bidirectional(LSTM(300, activation='tanh', recurrent_activation='hard_sigmoid', recurrent_dropout=0.0, dropout=0.2, 
-            kernel_constraint=maxnorm(3), kernel_initializer='glorot_uniform'), merge_mode='concat')
+blstm_layer = Bidirectional(LSTM(300,
+    activation='tanh',
+    recurrent_activation='hard_sigmoid',
+    recurrent_dropout=0.0,
+    dropout=0.2, 
+    kernel_constraint=maxnorm(3),
+    kernel_initializer='glorot_uniform'),
+    merge_mode='concat')
 
-sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
+sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,),
+    dtype='int32')
 embedded_sequences = embedding_layer(sequence_input)
 blstm_1 = blstm_layer(embedded_sequences)
 
 dense_1 = Dropout(0.5)(blstm_1)
 dense_1 = BatchNormalization()(dense_1)
-dense_1 = Dense(200, activation='relu', kernel_initializer='glorot_uniform')(dense_1)
+dense_1 = Dense(200,
+    activation='relu',
+    kernel_initializer='glorot_uniform')(dense_1)
 
 dense_2 = Dropout(0.5)(dense_1)
 dense_2 = BatchNormalization()(dense_2)
 
-preds = Dense(nb_classes, activation='softmax')(dense_2)
+preds = Dense(nb_classes,
+    activation='softmax')(dense_2)
 
 #=========================================================== Train the model ===================================================================
 model = Model(inputs=[sequence_input],
-        outputs=preds)
+    outputs=preds)
 model.compile(loss='categorical_crossentropy',
-        optimizer='adam',
-        metrics=['acc'])
+    optimizer='adam',
+    metrics=['acc'])
 
 model.summary()
 print(STAMP)
@@ -159,10 +179,19 @@ with open(STAMP + ".json", "w") as json_file:
     json_file.write(model_json)
 
 
-early_stopping =EarlyStopping(monitor='val_loss', patience=3)
+early_stopping =EarlyStopping(monitor='val_loss',
+    patience=3)
 bst_model_path = STAMP + '.h5'
-model_checkpoint = ModelCheckpoint(bst_model_path, monitor='val_acc', verbose=1, save_best_only=True, save_weights_only=True)
+model_checkpoint = ModelCheckpoint(bst_model_path,
+    monitor='val_acc',
+    verbose=1,
+    save_best_only=True,
+    save_weights_only=True)
 
 
-hist = model.fit(X_train, y_train, validation_data=(X_val, y_val),
-        epochs=200, batch_size=256, shuffle=True, callbacks=[early_stopping, model_checkpoint])
+hist = model.fit(X_train, y_train,
+    validation_data=(X_val, y_val),
+    epochs=200,
+    batch_size=256,
+    shuffle=True,
+    callbacks=[early_stopping, model_checkpoint])

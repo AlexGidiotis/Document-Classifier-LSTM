@@ -1,11 +1,11 @@
 import os
-import numpy as np
 import re
-from nltk import word_tokenize
 import csv
+
 import pandas as pd
+import numpy as np
 
-
+from nltk import word_tokenize
 
 # Simple preprocessing for texts.
 def preprocess(text):
@@ -32,8 +32,10 @@ test_split = 0.25
 df = pd.DataFrame()
 for doc in sorted(os.listdir(root_path)):
 	if doc.split('_')[1] != 'dump': continue
-	df_temp = pd.read_csv(root_path+doc, usecols=['abstract', 'categories'])
-	df = df.append(df_temp, ignore_index=True)
+	df_temp = pd.read_csv(root_path+doc,
+		usecols=['abstract', 'categories'])
+	df = df.append(df_temp,
+		ignore_index=True)
 # Shuffle the dataset.
 df = df.sample(frac=1).reset_index(drop=True)
 
