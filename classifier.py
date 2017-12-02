@@ -90,9 +90,6 @@ for c,(vector,target) in enumerate(train_set):  # load one vector into memory at
 	if c % 10000 == 0: 
 		print c
 
-	if c > 200000: 
-		break
-
 print len(X_data), 'training examples'
 
 # Dictionary of classes.
@@ -126,6 +123,9 @@ tokenizer.fit_on_texts(X_data)
 X_data = tokenizer.texts_to_sequences(X_data)
 word_index = tokenizer.word_index
 print('Found %s unique tokens' % len(word_index))
+with open('word_index.json', 'w') as fp:
+	json.dump(word_index, fp)
+print 'Exported word dictionary'
 X_data = pad_sequences(X_data,
 	maxlen=MAX_SEQUENCE_LENGTH,
 	padding='post',
@@ -153,8 +153,7 @@ blstm_layer = Bidirectional(LSTM(300,
 	activation='tanh',
 	recurrent_activation='hard_sigmoid',
 	recurrent_dropout=0.0,
-	dropout=0.2, 
-	kernel_constraint=maxnorm(3),
+	dropout=0.1,
 	kernel_initializer='glorot_uniform'),
 	merge_mode='concat')
 
@@ -163,13 +162,13 @@ sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,),
 embedded_sequences = embedding_layer(sequence_input)
 blstm_1 = blstm_layer(embedded_sequences)
 
-dense_1 = Dropout(0.5)(blstm_1)
+dense_1 = Dropout(0.1)(blstm_1)
 dense_1 = BatchNormalization()(dense_1)
 dense_1 = Dense(200,
 	activation='relu',
 	kernel_initializer='glorot_uniform')(dense_1)
 
-dense_2 = Dropout(0.5)(dense_1)
+dense_2 = Dropout(0.1)(dense_1)
 dense_2 = BatchNormalization()(dense_2)
 
 preds = Dense(nb_classes,
@@ -193,7 +192,7 @@ with open(STAMP + ".json", "w") as json_file:
 
 
 early_stopping =EarlyStopping(monitor='val_loss',
-	patience=5)
+	patience=10)
 bst_model_path = STAMP + '.h5'
 model_checkpoint = ModelCheckpoint(bst_model_path,
 	monitor='val_categorical_accuracy',
@@ -205,6 +204,6 @@ model_checkpoint = ModelCheckpoint(bst_model_path,
 hist = model.fit(X_train, y_train,
 	validation_data=(X_val, y_val),
 	epochs=200,
-	batch_size=256,
+	batch_size=64,
 	shuffle=True,
 	callbacks=[early_stopping, model_checkpoint])
