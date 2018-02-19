@@ -6,17 +6,21 @@ import pandas as pd
 import numpy as np
 
 from nltk import word_tokenize
+from nltk.corpus import stopwords
+
+english_stopwords = stopwords.words('english')
 
 # Simple preprocessing for texts.
 def preprocess(text):
 	min_length = 3
+	text = re.sub('\d+','#',text)
 	# Tokenize
 	words = map(lambda word: word.lower(), word_tokenize(text))
 	tokens = words
 	# Remove non characters
-	p = re.compile('[a-zA-Z]+')
+	p = re.compile('[a-zA-Z#]+')
 	# Filter tokens (we do not remove stopwords)
-	filtered_tokens = list(filter(lambda token: p.match(token) and len(token)>=min_length, tokens))
+	filtered_tokens = list(filter(lambda token: p.match(token) and len(token)>=min_length and (token not in english_stopwords), tokens))
 	# Encode to ascii
 	filtered_tokens = [token.encode('ascii','ignore') for token in filtered_tokens]
 
@@ -25,7 +29,7 @@ def preprocess(text):
 
 # Modify this path
 root_path = '/home/alex/Documents/Data/arxiv_data/'
-test_split = 0.25
+test_split = 0.1
 
 
 # Read all the data.

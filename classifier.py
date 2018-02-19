@@ -55,26 +55,17 @@ class Corpus(object):
 		for i,(line,target_list) in enumerate(zip(open(self.in_file),open(self.target_file))):
 			# We train using only the first of possibly multiple classes.
 			labels = target_list.strip().split(',')
-			h_labels = []
-			for label in labels:
-				h_lab = re.findall('(.+)\..+',label)
-				if len(h_lab) > 0:
-					h_labels.append(h_lab[0])
-				else:
-					h_labels.append(label)
-				
-			yield ' '.join(line.strip().replace('-',' ').split(',')),labels,h_labels
+
+			yield ' '.join(line.strip().replace('-',' ').split(',')),labels
 
 
 def load_data(train_set,
 	multilabel=True):
 	X_data = []
 	y_data = []
-	y_h_data = []
-	for c,(vector,target,h_target) in enumerate(train_set):  # load one vector into memory at a time
+	for c,(vector,target) in enumerate(train_set):  # load one vector into memory at a time
 		X_data.append(vector)
 		y_data.append(target)
-		y_h_data.append(h_target)
 		if c % 10000 == 0: 
 			print c
 
@@ -82,28 +73,16 @@ def load_data(train_set,
 
 	# Dictionary of classes.
 	class_list = list(set([y for y_seq in y_data for y in y_seq]))
-	h_class_list = list(set([y for y_seq in y_h_data for y in y_seq]))
 	nb_classes = len(class_list)
 	print nb_classes,'classes'
-	nb_h_classes = len(h_class_list)
-	print nb_h_classes,'higher classes'
 	class_dict = dict(zip(class_list, np.arange(len(class_list))))
 	with open('class_dict.json', 'w') as fp:
 		json.dump(class_dict, fp)
 	print 'Exported class dictionary'
-	h_class_dict = dict(zip(h_class_list, np.arange(len(h_class_list))))
-	with open('higher_class_dict.json', 'w') as fp:
-		json.dump(h_class_dict, fp)
-	print 'Exported higher class dictionary'
 
 	y_data_int = []
 	for y_seq in y_data:
 		y_data_int.append([class_dict[ y_seq[0]]])
-
-	y_h_data_int = []
-	for y_seq in y_h_data:
-		if len(y_seq)>0:
-			y_h_data_int.append([h_class_dict[y_seq[0]]])
 
 	# Tokenize and pad text.
 	tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
@@ -125,25 +104,17 @@ def load_data(train_set,
 		mlb = MultiLabelBinarizer()
 		mlb.fit([class_dict.values()])
 		y_data = mlb.transform(y_data_int)
-
-		mlb_h = MultiLabelBinarizer()
-		mlb_h.fit([h_class_dict.values()])
-		y_h_data = mlb_h.transform(y_h_data_int)
 	else:
 		y_data = to_categorical(y_data_int)
 		y_h_data = to_categorical(y_h_data_int)
 
 	print('Shape of label tensor:', y_data.shape)
-	print('Shape of higher label tensor:', y_h_data.shape)
 
 	X_train, X_val, y_train, y_val = train_test_split(X_data, y_data,
 		test_size=0.1,
 		random_state=42)
-	X_train, X_val, y_h_train, y_h_val = train_test_split(X_data, y_h_data,
-		test_size=0.1,
-		random_state=42)
 
-	return X_train, X_val, y_train, y_val, y_h_train, y_h_val, nb_classes, nb_h_classes, word_index
+	return X_train, X_val, y_train, y_val, nb_classes, word_index
 
 
 def prepare_embeddings(wrd2id): 
@@ -173,7 +144,6 @@ def prepare_embeddings(wrd2id):
 
 
 def build_model(nb_classes,
-	nb_h_classes,
 	word_index,
 	embedding_dim,
 	seq_length,
@@ -190,39 +160,26 @@ def build_model(nb_classes,
 		input_length=seq_length,
 		weights=[embedding_matrix],
 		trainable=True)(input_layer)
-	
-	drop1 = Dropout(0.25)(embedding_layer)
 
-	conv1 = Convolution1D(128, (2),
-		activation='relu',
-		padding='valid',
-		kernel_initializer='lecun_uniform')(drop1)
+	lstm_1 = Bidirectional(LSTM(100, name='blstm_1',
+	activation='tanh',
+	recurrent_activation='hard_sigmoid',
+	recurrent_dropout=0.0,
+	dropout=0.5, 
+	kernel_initializer='glorot_uniform',
+	return_sequences=True),
+	merge_mode='concat')(embedding_layer)
 
-	conv1 = BatchNormalization()(conv1)
-	conv1 = MaxPooling1D(5)(conv1)
-	conv1 = Flatten()(conv1)
+	lstm_2 = Bidirectional(LSTM(100, name='blstm_2',
+	activation='tanh',
+	recurrent_activation='hard_sigmoid',
+	recurrent_dropout=0.0,
+	dropout=0.5, 
+	kernel_initializer='glorot_uniform',
+	return_sequences=False),
+	merge_mode='concat')(lstm_1)
 
-	conv2 = Convolution1D(128, (4),
-		activation='relu',
-		padding='valid',
-		kernel_initializer='lecun_uniform')(drop1)
-
-	conv2 = BatchNormalization()(conv2)
-	conv2 = MaxPooling1D(5)(conv2)
-	conv2 = Flatten()(conv2)
-
-	conv3 = Convolution1D(128, (8),
-		activation='relu',
-		padding='valid',
-		kernel_initializer='lecun_uniform')(drop1)
-
-	conv3 = BatchNormalization()(conv3)
-	conv3 = MaxPooling1D(5)(conv3)
-	conv3 = Flatten()(conv3)
-	
-	concat = concatenate([conv1, conv2, conv3], axis=1)
-
-	drop2 = Dropout(0.5)(concat)
+	drop2 = Dropout(0.5)(lstm_2)
 
 	dense1 = Dense(512,
 		activation='relu',
@@ -232,15 +189,9 @@ def build_model(nb_classes,
 	drop3 = Dropout(0.5)(dense1)
 
 	if multilabel:
-		h_predictions = Dense(nb_h_classes, activation='sigmoid',
-			name='higher_classes')(drop3)
+		predictions = Dense(nb_classes, activation='sigmoid')(drop3)
 
-		h_concat = concatenate([drop3,h_predictions], axis=1)
-
-		predictions = Dense(nb_classes, activation='sigmoid',
-			name='classes')(h_concat)
-
-		model = Model(inputs=input_layer, outputs=[predictions,h_predictions])
+		model = Model(inputs=input_layer, outputs=predictions)
 
 		adam = Adam(lr=0.001,
 			decay=0.0)
@@ -286,7 +237,7 @@ def load_model(stamp,
 
 	model.summary()
 
-	adam = Adam(lr=0.0001)
+	adam = Adam(lr=0.001)
 	if multilabel:
 		model.compile(loss='binary_crossentropy',
 			optimizer=adam,
@@ -335,7 +286,7 @@ if __name__ == '__main__':
 
 	train_set = Corpus(DATA_DIR+TRAIN_FILE,DATA_DIR+TRAIN_LABS)
 
-	X_train, X_val, y_train, y_val, y_h_train, y_h_val, nb_classes, nb_h_classes, word_index = load_data(train_set,
+	X_train, X_val, y_train, y_val, nb_classes, word_index = load_data(train_set,
 		multilabel)
 
 	if load_previous == 'yes':
@@ -346,7 +297,6 @@ if __name__ == '__main__':
 			nb_classes)
 	else:
 		model = build_model(nb_classes,
-			nb_h_classes,
 			word_index,
 			EMBEDDING_DIM,
 			MAX_SEQUENCE_LENGTH,
@@ -362,8 +312,8 @@ if __name__ == '__main__':
 		save_best_only=True,
 		save_weights_only=True)
 
-	hist = model.fit(X_train, [y_train,y_h_train],
-		validation_data=(X_val, [y_val,y_h_val]),
+	hist = model.fit(X_train, y_train,
+		validation_data=(X_val, y_val),
 		epochs=200,
 		batch_size=128,
 		shuffle=True,
