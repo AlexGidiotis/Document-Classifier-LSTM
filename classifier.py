@@ -20,6 +20,8 @@ from keras.constraints import maxnorm
 from keras.models import model_from_json
 from keras.optimizers import Adam
 
+import tensorflow as tf
+
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import f1_score
@@ -39,6 +41,29 @@ MAX_SEQUENCE_LENGTH = 100 # MAYBE BIGGER
 EMBEDDING_DIM = 200
 # The name of the model.
 STAMP = 'doc_blstm'
+
+
+def f1_score(y_true, y_pred):
+    """
+    Compute the micro f(b) score with b=1.
+    """
+    y_true = tf.cast(y_true, "float32")
+    y_pred = tf.cast(tf.round(y_pred), "float32") # implicit 0.5 threshold via tf.round
+    y_correct = y_true * y_pred
+
+
+    sum_true = tf.reduce_sum(y_true, axis=1)
+    sum_pred = tf.reduce_sum(y_pred, axis=1)
+    sum_correct = tf.reduce_sum(y_correct, axis=1)
+
+
+    precision = sum_correct / sum_pred
+    recall = sum_correct / sum_true
+    f_score = 2 * precision * recall / (precision + recall)
+    f_score = tf.where(tf.is_nan(f_score), tf.zeros_like(f_score), f_score)
+
+
+    return tf.reduce_mean(f_score)
 
 
 class Corpus(object):
@@ -61,9 +86,12 @@ class Corpus(object):
 
 def load_data(train_set,
 	multilabel=True):
+	"""
+	"""
+
 	X_data = []
 	y_data = []
-	for c,(vector,target) in enumerate(train_set):  # load one vector into memory at a time
+	for c,(vector,target) in enumerate(train_set):
 		X_data.append(vector)
 		y_data.append(target)
 		if c % 10000 == 0: 
@@ -71,7 +99,7 @@ def load_data(train_set,
 
 	print len(X_data), 'training examples'
 
-	# Dictionary of classes.
+
 	class_list = list(set([y for y_seq in y_data for y in y_seq]))
 	nb_classes = len(class_list)
 	print nb_classes,'classes'
@@ -80,25 +108,31 @@ def load_data(train_set,
 		json.dump(class_dict, fp)
 	print 'Exported class dictionary'
 
+
 	y_data_int = []
 	for y_seq in y_data:
 		y_data_int.append([class_dict[ y_seq[0]]])
 
-	# Tokenize and pad text.
+
 	tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
 	tokenizer.fit_on_texts(X_data)
 	X_data = tokenizer.texts_to_sequences(X_data)
-	word_index = tokenizer.word_index
-	print('Found %s unique tokens' % len(word_index))
-	with open('word_index.json', 'w') as fp:
-		json.dump(word_index, fp)
-	print 'Exported word dictionary'
+
+
 	X_data = pad_sequences(X_data,
 		maxlen=MAX_SEQUENCE_LENGTH,
 		padding='post',
 		truncating='post',
 		dtype='float32')
 	print('Shape of data tensor:', X_data.shape)
+
+	
+	word_index = tokenizer.word_index
+	print('Found %s unique tokens' % len(word_index))
+	with open('word_index.json', 'w') as fp:
+		json.dump(word_index, fp)
+	print 'Exported word dictionary'
+
 
 	if multilabel:
 		mlb = MultiLabelBinarizer()
@@ -107,8 +141,8 @@ def load_data(train_set,
 	else:
 		y_data = to_categorical(y_data_int)
 		y_h_data = to_categorical(y_h_data_int)
-
 	print('Shape of label tensor:', y_data.shape)
+
 
 	X_train, X_val, y_train, y_val = train_test_split(X_data, y_data,
 		test_size=0.1,
@@ -118,8 +152,12 @@ def load_data(train_set,
 
 
 def prepare_embeddings(wrd2id): 
+	"""
+	"""
+
 	vocab_size = len(wrd2id)
 	print "Found %s words in the vocabulary." % vocab_size
+
 
 	embedding_idx = {}
 	glove_f = open(EMBEDDING_FILE)
@@ -132,14 +170,21 @@ def prepare_embeddings(wrd2id):
 	glove_f.close()
 	print "Found %s word vectors." % len(embedding_idx)
 
-	embedding_mat = np.zeros((vocab_size+1,EMBEDDING_DIM))
+
+	embedding_mat = np.random.rand(vocab_size+1,EMBEDDING_DIM)
+
+	wrds_with_embeddings = 0
 	for wrd, i in wrd2id.items():
 		embedding_vec = embedding_idx.get(wrd)
-		# words without embeddings will be left with zeros.
+		# words without embeddings will be left with random values.
 		if embedding_vec is not None:
+			wrds_with_embeddings += 1
 			embedding_mat[i] = embedding_vec
 
+
 	print embedding_mat.shape
+	print 'Words with embeddings:',wrds_with_embeddings
+
 	return embedding_mat, vocab_size
 
 
@@ -149,6 +194,8 @@ def build_model(nb_classes,
 	seq_length,
 	stamp,
 	multilabel=True):
+	"""
+	"""
 
 	embedding_matrix, nb_words = prepare_embeddings(word_index)
 
@@ -165,7 +212,7 @@ def build_model(nb_classes,
 	activation='tanh',
 	recurrent_activation='hard_sigmoid',
 	recurrent_dropout=0.0,
-	dropout=0.5, 
+	dropout=0.25, 
 	kernel_initializer='glorot_uniform',
 	return_sequences=True),
 	merge_mode='concat')(embedding_layer)
@@ -188,6 +235,7 @@ def build_model(nb_classes,
 
 	drop3 = Dropout(0.5)(dense1)
 
+
 	if multilabel:
 		predictions = Dense(nb_classes, activation='sigmoid')(drop3)
 
@@ -198,7 +246,7 @@ def build_model(nb_classes,
 
 		model.compile(loss='binary_crossentropy',
 			optimizer=adam,
-			metrics=[])
+			metrics=[f1_score])
 
 
 	else:
@@ -213,8 +261,10 @@ def build_model(nb_classes,
 			optimizer=adam,
 			metrics=['accuracy'])
 
+
 	model.summary()
 	print(stamp)
+
 
 	# Save the model.
 	model_json = model.to_json()
@@ -227,6 +277,9 @@ def build_model(nb_classes,
 
 def load_model(stamp,
 	multilabel=True):
+	"""
+	"""
+
 	json_file = open(stamp+'.json', 'r')
 	loaded_model_json = json_file.read()
 	json_file.close()
@@ -237,11 +290,12 @@ def load_model(stamp,
 
 	model.summary()
 
+
 	adam = Adam(lr=0.001)
 	if multilabel:
 		model.compile(loss='binary_crossentropy',
 			optimizer=adam,
-			metrics=[])
+			metrics=[f1_score])
 	else:
 		model.compile(loss='categorical_crossentropy',
 			optimizer=adam,
@@ -249,40 +303,11 @@ def load_model(stamp,
 
 	return model
 
-def fine_tune_model(stamp,
-	nb_classes):
-
-	json_file = open(stamp+'.json', 'r')
-	loaded_model_json = json_file.read()
-	json_file.close()
-	model = model_from_json(loaded_model_json)
-
-	model.load_weights(stamp+'.h5')
-	print("Loaded model from disk")
-
-	last_dense = model.layers[-2].output
-
-	predictions = Dense(nb_classes,
-		activation='sigmoid',
-		name='prediction')(last_dense)
-
-	new_model = Model(inputs=model.layers[0].input, outputs=predictions)
-
-	new_model.summary()
-
-	adam = Adam(lr=1e-5)
-	
-	new_model.compile(loss='binary_crossentropy',
-		optimizer=adam,
-		metrics=[])
-
-	return new_model
-
 
 if __name__ == '__main__':
 	multilabel = True
 
-	load_previous = raw_input('Type yes/no/fine-tune if you want to load previous model: ')
+	load_previous = raw_input('Type yes/no if you want to load previous model: ')
 
 	train_set = Corpus(DATA_DIR+TRAIN_FILE,DATA_DIR+TRAIN_LABS)
 
@@ -292,9 +317,6 @@ if __name__ == '__main__':
 	if load_previous == 'yes':
 		model = load_model(STAMP,
 			multilabel)
-	elif load_previous == 'fine-tune':
-		model = fine_tune_model(STAMP,
-			nb_classes)
 	else:
 		model = build_model(nb_classes,
 			word_index,
@@ -303,13 +325,19 @@ if __name__ == '__main__':
 			STAMP,
 			multilabel)
 
-	early_stopping =EarlyStopping(monitor='val_loss',
+	if multilabel:
+		monitor_metric = 'val_f1_score'
+	else:
+		monitor_metric = 'val_loss'
+
+	early_stopping =EarlyStopping(monitor=monitor_metric,
 		patience=5)
 	bst_model_path = STAMP + '.h5'
 	model_checkpoint = ModelCheckpoint(bst_model_path,
-		monitor='val_loss',
+		monitor=monitor_metric,
 		verbose=1,
 		save_best_only=True,
+		mode='max',
 		save_weights_only=True)
 
 	hist = model.fit(X_train, y_train,
