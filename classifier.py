@@ -1,5 +1,8 @@
+
 import json
 import re
+import sys
+from collections import Counter, OrderedDict
 
 import numpy as np
 import pandas as pd
@@ -12,13 +15,16 @@ from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils.np_utils import to_categorical
 from keras.layers.wrappers import Bidirectional
-from keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation, Convolution1D, MaxPooling1D, Flatten, concatenate
+from keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation, Convolution1D, MaxPooling1D, Flatten, concatenate, GlobalMaxPooling1D
+from keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D
 from keras.models import Model
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
 from keras.constraints import maxnorm
 from keras.models import model_from_json
 from keras.optimizers import Adam
+from keras import regularizers
+
 
 import tensorflow as tf
 
@@ -44,41 +50,41 @@ STAMP = 'doc_blstm'
 
 
 def f1_score(y_true, y_pred):
-    """
-    Compute the micro f(b) score with b=1.
-    """
-    y_true = tf.cast(y_true, "float32")
-    y_pred = tf.cast(tf.round(y_pred), "float32") # implicit 0.5 threshold via tf.round
-    y_correct = y_true * y_pred
+	"""
+	Compute the micro f(b) score with b=1.
+	"""
+	y_true = tf.cast(y_true, "float32")
+	y_pred = tf.cast(tf.round(y_pred), "float32") # implicit 0.5 threshold via tf.round
+	y_correct = y_true * y_pred
 
 
-    sum_true = tf.reduce_sum(y_true, axis=1)
-    sum_pred = tf.reduce_sum(y_pred, axis=1)
-    sum_correct = tf.reduce_sum(y_correct, axis=1)
+	sum_true = tf.reduce_sum(y_true, axis=1)
+	sum_pred = tf.reduce_sum(y_pred, axis=1)
+	sum_correct = tf.reduce_sum(y_correct, axis=1)
 
 
-    precision = sum_correct / sum_pred
-    recall = sum_correct / sum_true
-    f_score = 2 * precision * recall / (precision + recall)
-    f_score = tf.where(tf.is_nan(f_score), tf.zeros_like(f_score), f_score)
+	precision = sum_correct / sum_pred
+	recall = sum_correct / sum_true
+	f_score = 2 * precision * recall / (precision + recall)
+	f_score = tf.where(tf.is_nan(f_score), tf.zeros_like(f_score), f_score)
 
 
-    return tf.reduce_mean(f_score)
+	return tf.reduce_mean(f_score)
 
 
 class Corpus(object):
-	# Data generator.
-	# INitialize the input files.
+	"""
+	"""
 	def __init__(self,in_file,
 		target_file=None):
 		self.in_file = in_file
 		self.target_file = target_file
 		self.__iter__()
 
-	# Yield one row,target pair per iteration. Each row is an abstract (preprocessed)
+
 	def __iter__(self):
 		for i,(line,target_list) in enumerate(zip(open(self.in_file),open(self.target_file))):
-			# We train using only the first of possibly multiple classes.
+
 			labels = target_list.strip().split(',')
 
 			yield ' '.join(line.strip().replace('-',' ').split(',')),labels
@@ -99,11 +105,13 @@ def load_data(train_set,
 
 	print len(X_data), 'training examples'
 
+	class_freqs = Counter([y for y_seq in y_data for y in y_seq]).most_common()
 
-	class_list = list(set([y for y_seq in y_data for y in y_seq]))
+	class_list = [y[0] for y in class_freqs]
 	nb_classes = len(class_list)
 	print nb_classes,'classes'
 	class_dict = dict(zip(class_list, np.arange(len(class_list))))
+
 	with open('class_dict.json', 'w') as fp:
 		json.dump(class_dict, fp)
 	print 'Exported class dictionary'
@@ -111,7 +119,7 @@ def load_data(train_set,
 
 	y_data_int = []
 	for y_seq in y_data:
-		y_data_int.append([class_dict[ y_seq[0]]])
+		y_data_int.append([class_dict[y] for y in y_seq])
 
 
 	tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
@@ -143,9 +151,9 @@ def load_data(train_set,
 		y_h_data = to_categorical(y_h_data_int)
 	print('Shape of label tensor:', y_data.shape)
 
-
 	X_train, X_val, y_train, y_val = train_test_split(X_data, y_data,
-		test_size=0.1,
+		train_size=0.8,
+		test_size=0.2,
 		random_state=42)
 
 	return X_train, X_val, y_train, y_val, nb_classes, word_index
@@ -155,7 +163,7 @@ def prepare_embeddings(wrd2id):
 	"""
 	"""
 
-	vocab_size = len(wrd2id)
+	vocab_size = MAX_NB_WORDS
 	print "Found %s words in the vocabulary." % vocab_size
 
 
@@ -174,7 +182,11 @@ def prepare_embeddings(wrd2id):
 	embedding_mat = np.random.rand(vocab_size+1,EMBEDDING_DIM)
 
 	wrds_with_embeddings = 0
+	# Keep the MAX_NB_WORDS most frequent tokens.
 	for wrd, i in wrd2id.items():
+		if i > vocab_size:
+			continue
+
 		embedding_vec = embedding_idx.get(wrd)
 		# words without embeddings will be left with random values.
 		if embedding_vec is not None:
@@ -206,8 +218,10 @@ def build_model(nb_classes,
 		output_dim=embedding_dim,
 		input_length=seq_length,
 		weights=[embedding_matrix],
+		embeddings_regularizer=regularizers.l2(0.00),
 		trainable=True)(input_layer)
 
+	
 	lstm_1 = Bidirectional(LSTM(100, name='blstm_1',
 	activation='tanh',
 	recurrent_activation='hard_sigmoid',
@@ -216,24 +230,28 @@ def build_model(nb_classes,
 	kernel_initializer='glorot_uniform',
 	return_sequences=True),
 	merge_mode='concat')(embedding_layer)
-
+	lstm_1 = BatchNormalization()(lstm_1)
+	'''
 	lstm_2 = Bidirectional(LSTM(100, name='blstm_2',
 	activation='tanh',
 	recurrent_activation='hard_sigmoid',
 	recurrent_dropout=0.0,
 	dropout=0.5, 
 	kernel_initializer='glorot_uniform',
-	return_sequences=False),
+	return_sequences=True),
 	merge_mode='concat')(lstm_1)
+	lstm_2 = BatchNormalization()(lstm_2)
+	'''
 
-	drop2 = Dropout(0.5)(lstm_2)
-
-	dense1 = Dense(512,
+	pooling = GlobalMaxPooling1D()(lstm_1)
+	'''
+	drop2 = Dropout(0.5)(pooling)
+	dense1 = Dense(100,
 		activation='relu',
-		kernel_initializer='lecun_uniform')(drop2)
+		kernel_initializer='glorot_uniform')(drop2)
 	dense1 = BatchNormalization()(dense1)
-
-	drop3 = Dropout(0.5)(dense1)
+	'''
+	drop3 = Dropout(0.5)(pooling)
 
 
 	if multilabel:
@@ -305,16 +323,29 @@ def load_model(stamp,
 
 
 if __name__ == '__main__':
-	multilabel = True
 
-	load_previous = raw_input('Type yes/no if you want to load previous model: ')
+	multilabel,load_previous = sys.argv[1:]
+
+	print multilabel,load_previous
+
+	if multilabel == 'multi':
+		multilabel = True
+	else:
+		multilabel = False
+
+
+	if load_previous == 'load':
+		load_previous = True
+	else:
+		load_previous = False
+
 
 	train_set = Corpus(DATA_DIR+TRAIN_FILE,DATA_DIR+TRAIN_LABS)
 
 	X_train, X_val, y_train, y_val, nb_classes, word_index = load_data(train_set,
 		multilabel)
 
-	if load_previous == 'yes':
+	if load_previous:
 		model = load_model(STAMP,
 			multilabel)
 	else:
@@ -342,9 +373,9 @@ if __name__ == '__main__':
 
 	hist = model.fit(X_train, y_train,
 		validation_data=(X_val, y_val),
-		epochs=200,
+		epochs=100,
 		batch_size=128,
 		shuffle=True,
-		callbacks=[early_stopping, model_checkpoint])
+		callbacks=[model_checkpoint])
 
 	print hist.history
