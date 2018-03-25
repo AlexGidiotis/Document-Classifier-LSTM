@@ -19,7 +19,6 @@ Pretrained word e,beddings can be used. The embeddings can either be GloVe or Wo
 
 3) The trained model is exported to json and the weights to h5 for later use.
 
-
 ## Requirements
 
 - Python
