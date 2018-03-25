@@ -7,10 +7,6 @@ from collections import Counter, OrderedDict
 import numpy as np
 import pandas as pd
 
-import gensim
-from gensim import corpora
-from gensim.models import KeyedVectors
-
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils.np_utils import to_categorical

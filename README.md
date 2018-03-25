@@ -1,13 +1,14 @@
 # Document-Classifier-LSTM
-A bidirectional LSTM that reads the abstract of a paper and classifies it into 165 different categories from arxiv.
+A multilclass, multilabel classification model for texts. The model is a bidirectional LSTM with a max pooling layer on top that learns to
+tag samll texts with 169 different tags from arxiv.
 
-The architecture is still far from optimal. The trained model currently achieves 79% validation accuracy.
+This neural network was built using Keras and Tensorflow.
+
+The trained model achieves a micro f-score of 0.65 on the test set.
 
 I am using 500k paper abstracts from arxiv. In order to download your own data refer to the arxiv OAI api https://arxiv.org/help/bulk_data.
 
-The embedding space uses the trained word vectors from GoogleNews-vectors-negative300. You can download the .bin file here https://code.google.com/archive/p/word2vec/. 
-
-The model is a toy project that illustrates how to build a simple LSTM for sequence classification using TensorFlow and Keras.
+Pretrained word e,beddings can be used. The embeddings can either be GloVe or Word2Vec. You can download the   GoogleNews-vectors-negative300.bin file here https://code.google.com/archive/p/word2vec/. 
 
 
 ## Usage:
@@ -19,20 +20,16 @@ The model is a toy project that illustrates how to build a simple LSTM for seque
 3) The trained model is exported to json and the weights to h5 for later use.
 
 
-## List of dependencies:
+## Requirements
 
-1) numpy
+- Python
+- NLTK
+- NumPy
+- Pandas
+- SciPy
+- OpenCV
+- scikit-learn
+- [Tensorflow](https://github.com/tensorflow/tensorflow)
+- [Keras](https://github.com/fchollet/keras)
 
-2) pandas
-
-3) nltk
-
-4) sklearn
-
-5) gensim
-
-6) keras
-
-7) tensorfow
-
-8) csv
+Run `pip install -r requirements.txt` to install the requirements.
