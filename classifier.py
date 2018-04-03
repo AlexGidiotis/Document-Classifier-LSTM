@@ -12,7 +12,7 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.utils.np_utils import to_categorical
 from keras.layers.wrappers import Bidirectional
 from keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation, Convolution1D, MaxPooling1D, Flatten, concatenate, GlobalMaxPooling1D
-from keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D
+from keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D, SpatialDropout1D
 from keras.models import Model
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
@@ -28,6 +28,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import f1_score
 
+from attention import AttentionWithContext
 
 # Modify this paths as well
 DATA_DIR = '/home/alex/Documents/git_projects/Document-Classifier-LSTM/data/'
@@ -218,15 +219,19 @@ def build_model(nb_classes,
 		trainable=True)(input_layer)
 
 	
+	drop1 = SpatialDropout1D(0.3)(embedding_layer)
+
 	lstm_1 = Bidirectional(LSTM(100, name='blstm_1',
 	activation='tanh',
 	recurrent_activation='hard_sigmoid',
 	recurrent_dropout=0.0,
-	dropout=0.25, 
+	dropout=0.3, 
 	kernel_initializer='glorot_uniform',
 	return_sequences=True),
-	merge_mode='concat')(embedding_layer)
+	merge_mode='concat')(drop1)
 	lstm_1 = BatchNormalization()(lstm_1)
+
+	att_layer = AttentionWithContext()(lstm_1)
 	'''
 	lstm_2 = Bidirectional(LSTM(100, name='blstm_2',
 	activation='tanh',
@@ -239,16 +244,11 @@ def build_model(nb_classes,
 	lstm_2 = BatchNormalization()(lstm_2)
 	'''
 
-	pooling = GlobalMaxPooling1D()(lstm_1)
-	'''
-	drop2 = Dropout(0.5)(pooling)
-	dense1 = Dense(100,
-		activation='relu',
-		kernel_initializer='glorot_uniform')(drop2)
-	dense1 = BatchNormalization()(dense1)
-	'''
-	drop3 = Dropout(0.5)(pooling)
 
+	#pooling = GlobalMaxPooling1D()(att_layer)
+
+	drop3 = Dropout(0.5)(att_layer)
+	
 
 	if multilabel:
 		predictions = Dense(nb_classes, activation='sigmoid')(drop3)
