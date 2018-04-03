@@ -1,14 +1,14 @@
 # Document-Classifier-LSTM
-A multilclass, multilabel classification model for texts. The model is a bidirectional LSTM with a max pooling layer on top that learns to
+A multilclass, multilabel classification model for texts. The model is a bidirectional LSTM with attention that learns to
 tag samll texts with 169 different tags from arxiv.
 
 This neural network was built using Keras and Tensorflow.
 
-The trained model achieves a micro f-score of 0.65 on the test set.
+The trained model achieves a micro f-score of 0.67 on the test set.
 
 I am using 500k paper abstracts from arxiv. In order to download your own data refer to the arxiv OAI api https://arxiv.org/help/bulk_data.
 
-Pretrained word e,beddings can be used. The embeddings can either be GloVe or Word2Vec. You can download the   GoogleNews-vectors-negative300.bin file here https://code.google.com/archive/p/word2vec/. 
+Pretrained word embeddings can be used. The embeddings can either be GloVe or Word2Vec. You can download the   GoogleNews-vectors-negative300.bin file here https://code.google.com/archive/p/word2vec/. 
 
 
 ## Usage:
