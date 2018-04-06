@@ -36,6 +36,5 @@ Pretrained word embeddings can be used. The embeddings can either be GloVe or Wo
 - scikit-learn
 - [Tensorflow](https://github.com/tensorflow/tensorflow)
 - [Keras](https://github.com/fchollet/keras)
-- [gensim](https://radimrehurek.com/gensim)
 
 Run `pip install -r requirements.txt` to install the requirements.

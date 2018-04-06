@@ -27,8 +27,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import f1_score
 
-from gensim.models import KeyedVectors
-
 from attention import AttentionWithContext
 from data_gen import Corpus
 
@@ -37,13 +35,12 @@ DATA_DIR = '/home/alex/Documents/git_projects/Document-Classifier-LSTM/data/'
 TRAIN_FILE = 'train_set.csv'
 TRAIN_LABS = 'train_set_labels.csv'
 EMBEDDING_FILE = '/home/alex/Documents/Python/glove.6B/glove.6B.200d.txt'
-word2vec_embeddings = '/home/alex/Documents/GoogleNews-vectors-negative300/GoogleNews-vectors-negative300.bin'
 # The maximum number of words to be used. (most frequent)
 MAX_NB_WORDS = 80000
 # Max number of words in each abstract.
 MAX_SEQUENCE_LENGTH = 100 # MAYBE BIGGER
 # This is fixed.
-EMBEDDING_DIM = 300
+EMBEDDING_DIM = 200
 # The name of the model.
 STAMP = 'doc_blstm'
 
@@ -180,39 +177,6 @@ def prepare_embeddings(wrd2id):
 	print 'Words with embeddings:',wrds_with_embeddings
 
 	return embedding_mat, vocab_size
-
-
-def load_w2v_embeddings(wrd2id):
-	"""
-	"""
-
-	# Returns the embedding matrix for the words in our corpus.
-	print('Preparing embedding matrix')
-	print('Indexing word vectors')
-	# Read the pre-trained embeddings.
-	word2vec = KeyedVectors.load_word2vec_format(word2vec_embeddings,
-		binary=True,
-		limit=2000000)
-	print('Found %s word vectors of word2vec' % len(word2vec.vocab))
-
-	# Fill the embedding matrix.
-	vocab_size = min(MAX_NB_WORDS, len(wrd2id))
-
-	embedding_matrix = np.random.rand(vocab_size+1,EMBEDDING_DIM)
-
-	wrds_with_embeddings = 0
-	for word, i in wrd2id.items():
-		if i > vocab_size:
-			continue
-
-		if word in word2vec.vocab:
-			wrds_with_embeddings += 1
-			embedding_matrix[i] = word2vec.word_vec(word)
-
-
-	print 'Words with embeddings:',wrds_with_embeddings
-
-	return embedding_matrix,vocab_size
 
 
 def build_model(nb_classes,
