@@ -14,6 +14,7 @@ english_stopwords = stopwords.words('english')
 def preprocess(text):
 	min_length = 3
 	text = re.sub('\d+','#',text)
+	text = re.sub('\.',' eos ',text)
 	# Tokenize
 	words = map(lambda word: word.lower(), word_tokenize(text))
 	tokens = words

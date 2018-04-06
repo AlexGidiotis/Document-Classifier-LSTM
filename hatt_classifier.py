@@ -12,7 +12,7 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.utils.np_utils import to_categorical
 from keras.layers.wrappers import Bidirectional
 from keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation, Convolution1D, MaxPooling1D, Flatten, concatenate, GlobalMaxPooling1D
-from keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D, SpatialDropout1D
+from keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D, SpatialDropout1D ,TimeDistributed
 from keras.models import Model
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
@@ -21,31 +21,33 @@ from keras.models import model_from_json
 from keras.optimizers import Adam
 from keras import regularizers
 
+
 import tensorflow as tf
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import f1_score
 
-from gensim.models import KeyedVectors
-
 from attention import AttentionWithContext
-from data_gen import Corpus
+from data_gen import hierarchicalCorpus as Corpus
+
 
 # Modify this paths as well
 DATA_DIR = '/home/alex/Documents/git_projects/Document-Classifier-LSTM/data/'
 TRAIN_FILE = 'train_set.csv'
 TRAIN_LABS = 'train_set_labels.csv'
 EMBEDDING_FILE = '/home/alex/Documents/Python/glove.6B/glove.6B.200d.txt'
-word2vec_embeddings = '/home/alex/Documents/GoogleNews-vectors-negative300/GoogleNews-vectors-negative300.bin'
+
 # The maximum number of words to be used. (most frequent)
 MAX_NB_WORDS = 80000
 # Max number of words in each abstract.
 MAX_SEQUENCE_LENGTH = 100 # MAYBE BIGGER
+MAX_SENT_LEN = 25
+MAX_SEQ_LEN = 5
 # This is fixed.
-EMBEDDING_DIM = 300
+EMBEDDING_DIM = 200
 # The name of the model.
-STAMP = 'doc_blstm'
+STAMP = 'doc_hatt_blstm'
 
 
 def f1_score(y_true, y_pred):
@@ -84,7 +86,47 @@ def load_data(train_set,
 		if c % 10000 == 0: 
 			print c
 
-	print len(X_data), 'training examples'
+	num_texts = len(X_data)
+	print num_texts, 'training examples'
+
+	
+	tokenizer = Tokenizer(num_words=MAX_NB_WORDS,
+		oov_token=1)
+
+	X_data_flat = []
+	for raw_txt in X_data:
+		flat_txt = ''
+		for sent in raw_txt:
+			flat_txt += sent
+		X_data_flat.append(flat_txt)
+
+
+	tokenizer.fit_on_texts(X_data_flat)
+	X_data_int = np.zeros((num_texts,MAX_SEQ_LEN,MAX_SENT_LEN))
+	for idx,raw_txt in enumerate(X_data):
+		sentences_batch = np.zeros((MAX_SEQ_LEN,MAX_SENT_LEN))
+		tokens = tokenizer.texts_to_sequences(raw_txt)
+		sentences =  pad_sequences(tokens,
+			maxlen=MAX_SENT_LEN,
+			padding='post',
+			truncating='post',
+			dtype='int32')
+		for j,sent in enumerate(sentences):
+			if j >= MAX_SEQ_LEN:
+				break
+			sentences_batch[j,:] = sent
+		X_data_int[idx,:,:] = sentences_batch
+
+	X_data = X_data_int
+	print('Shape of data tensor:', X_data.shape)
+
+	
+	word_index = tokenizer.word_index
+	print('Found %s unique tokens' % len(word_index))
+	with open('word_index.json', 'w') as fp:
+		json.dump(word_index, fp)
+	print 'Exported word dictionary'
+
 
 	class_freqs = Counter([y for y_seq in y_data for y in y_seq]).most_common()
 
@@ -101,27 +143,6 @@ def load_data(train_set,
 	y_data_int = []
 	for y_seq in y_data:
 		y_data_int.append([class_dict[y] for y in y_seq])
-
-
-	tokenizer = Tokenizer(num_words=MAX_NB_WORDS,
-		oov_token=1)
-	tokenizer.fit_on_texts(X_data)
-	X_data = tokenizer.texts_to_sequences(X_data)
-
-
-	X_data = pad_sequences(X_data,
-		maxlen=MAX_SEQUENCE_LENGTH,
-		padding='post',
-		truncating='post',
-		dtype='float32')
-	print('Shape of data tensor:', X_data.shape)
-
-	
-	word_index = tokenizer.word_index
-	print('Found %s unique tokens' % len(word_index))
-	with open('word_index.json', 'w') as fp:
-		json.dump(word_index, fp)
-	print 'Exported word dictionary'
 
 
 	if multilabel:
@@ -182,39 +203,6 @@ def prepare_embeddings(wrd2id):
 	return embedding_mat, vocab_size
 
 
-def load_w2v_embeddings(wrd2id):
-	"""
-	"""
-
-	# Returns the embedding matrix for the words in our corpus.
-	print('Preparing embedding matrix')
-	print('Indexing word vectors')
-	# Read the pre-trained embeddings.
-	word2vec = KeyedVectors.load_word2vec_format(word2vec_embeddings,
-		binary=True,
-		limit=2000000)
-	print('Found %s word vectors of word2vec' % len(word2vec.vocab))
-
-	# Fill the embedding matrix.
-	vocab_size = min(MAX_NB_WORDS, len(wrd2id))
-
-	embedding_matrix = np.random.rand(vocab_size+1,EMBEDDING_DIM)
-
-	wrds_with_embeddings = 0
-	for word, i in wrd2id.items():
-		if i > vocab_size:
-			continue
-
-		if word in word2vec.vocab:
-			wrds_with_embeddings += 1
-			embedding_matrix[i] = word2vec.word_vec(word)
-
-
-	print 'Words with embeddings:',wrds_with_embeddings
-
-	return embedding_matrix,vocab_size
-
-
 def build_model(nb_classes,
 	word_index,
 	embedding_dim,
@@ -226,44 +214,51 @@ def build_model(nb_classes,
 
 	embedding_matrix, nb_words = prepare_embeddings(word_index)
 
-	input_layer = Input(shape=(seq_length,),
+	input_layer = Input(shape=(MAX_SEQ_LEN,MAX_SENT_LEN),
 		dtype='int32')
 
+
+	sentence_input = Input(shape=(MAX_SENT_LEN,),
+		dtype='int32')
 	embedding_layer = Embedding(input_dim=nb_words+1,
 		output_dim=embedding_dim,
-		input_length=seq_length,
+		input_length=MAX_SENT_LEN,
 		weights=[embedding_matrix],
 		embeddings_regularizer=regularizers.l2(0.00),
-		trainable=True)(input_layer)
+		trainable=True)(sentence_input)
 
-	
 	drop1 = SpatialDropout1D(0.3)(embedding_layer)
 
-	lstm_1 = Bidirectional(LSTM(128, name='blstm_1',
-	activation='tanh',
-	recurrent_activation='hard_sigmoid',
-	recurrent_dropout=0.0,
-	dropout=0.5, 
-	kernel_initializer='glorot_uniform',
-	return_sequences=True),
-	merge_mode='concat')(drop1)
+	sent_lstm = Bidirectional(LSTM(100, name='blstm_1',
+		activation='tanh',
+		recurrent_activation='hard_sigmoid',
+		recurrent_dropout=0.0,
+		dropout=0.4, 
+		kernel_initializer='glorot_uniform',
+		return_sequences=True),
+		merge_mode='concat')(drop1)
+
+
+	sent_att_layer = AttentionWithContext()(sent_lstm)
+	sentEncoder = Model(sentence_input, sent_att_layer)
+	sentEncoder.summary()
+	
+	textEncoder = TimeDistributed(sentEncoder)(input_layer)
+
+	drop2 = Dropout(0.4)(textEncoder)
+
+	lstm_1 = Bidirectional(LSTM(100, name='blstm_2',
+		activation='tanh',
+		recurrent_activation='hard_sigmoid',
+		recurrent_dropout=0.0,
+		dropout=0.4, 
+		kernel_initializer='glorot_uniform',
+		return_sequences=True),
+		merge_mode='concat')(drop2)
 	lstm_1 = BatchNormalization()(lstm_1)
 
 	att_layer = AttentionWithContext()(lstm_1)
-	'''
-	lstm_2 = Bidirectional(LSTM(100, name='blstm_2',
-	activation='tanh',
-	recurrent_activation='hard_sigmoid',
-	recurrent_dropout=0.0,
-	dropout=0.5, 
-	kernel_initializer='glorot_uniform',
-	return_sequences=True),
-	merge_mode='concat')(lstm_1)
-	lstm_2 = BatchNormalization()(lstm_2)
-	'''
 
-
-	#pooling = GlobalMaxPooling1D()(att_layer)
 
 	drop3 = Dropout(0.5)(att_layer)
 	
