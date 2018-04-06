@@ -250,20 +250,6 @@ def build_model(nb_classes,
 	lstm_1 = BatchNormalization()(lstm_1)
 
 	att_layer = AttentionWithContext()(lstm_1)
-	'''
-	lstm_2 = Bidirectional(LSTM(100, name='blstm_2',
-	activation='tanh',
-	recurrent_activation='hard_sigmoid',
-	recurrent_dropout=0.0,
-	dropout=0.5, 
-	kernel_initializer='glorot_uniform',
-	return_sequences=True),
-	merge_mode='concat')(lstm_1)
-	lstm_2 = BatchNormalization()(lstm_2)
-	'''
-
-
-	#pooling = GlobalMaxPooling1D()(att_layer)
 
 	drop3 = Dropout(0.5)(att_layer)
 	
