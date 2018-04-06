@@ -1,14 +1,15 @@
 # Document-Classifier-LSTM
-A multilclass, multilabel classification model for texts. The model is a bidirectional LSTM with attention that learns to
-tag samll texts with 169 different tags from arxiv.
+Recurrent Neural Networks for multilclass, multilabel classification of texts. The models that learn to tag samll texts with 169 different tags from arxiv. We implemented a standard BLSTM network with attentions and a Hierarchical Attention Network https://www.cs.cmu.edu/~hovy/papers/16HLT-hierarchical-attention-networks.pdf.
 
-This neural network was built using Keras and Tensorflow.
+This neural networks were built using Keras and Tensorflow.
 
-The trained model achieves a micro f-score of 0.67 on the test set.
+The best performing model is the attention BLSTM that achieves a micro f-score of 0.67 on the test set.
+
+The Hierarchical Attention Network achieves only 0.65 micro f-score.
 
 I am using 500k paper abstracts from arxiv. In order to download your own data refer to the arxiv OAI api https://arxiv.org/help/bulk_data.
 
-Pretrained word embeddings can be used. The embeddings can either be GloVe or Word2Vec. You can download the   GoogleNews-vectors-negative300.bin file here https://code.google.com/archive/p/word2vec/. 
+Pretrained word embeddings can be used. The embeddings can either be GloVe or Word2Vec. You can download the   GoogleNews-vectors-negative300.bin file here https://code.google.com/archive/p/word2vec/ or the GloVe embeddings here https://nlp.stanford.edu/projects/glove/. 
 
 
 ## Usage:
@@ -30,5 +31,6 @@ Pretrained word embeddings can be used. The embeddings can either be GloVe or Wo
 - scikit-learn
 - [Tensorflow](https://github.com/tensorflow/tensorflow)
 - [Keras](https://github.com/fchollet/keras)
+- [gensim](https://radimrehurek.com/gensim)
 
 Run `pip install -r requirements.txt` to install the requirements.
