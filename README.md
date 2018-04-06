@@ -1,7 +1,11 @@
 # Document-Classifier-LSTM
-Recurrent Neural Networks for multilclass, multilabel classification of texts. The models that learn to tag samll texts with 169 different tags from arxiv. We implemented a standard BLSTM network with attentions and a Hierarchical Attention Network https://www.cs.cmu.edu/~hovy/papers/16HLT-hierarchical-attention-networks.pdf.
+Recurrent Neural Networks for multilclass, multilabel classification of texts. The models that learn to tag samll texts with 169 different tags from arxiv. 
 
-This neural networks were built using Keras and Tensorflow.
+In classifier.py is implemented a standard BLSTM network with attention.
+
+In hatt_classifier.py you can find the implementation of [Hierarchical Attention Networks for Document Classification](https://www.cs.cmu.edu/~hovy/papers/16HLT-hierarchical-attention-networks.pdf).
+
+The neural networks were built using Keras and Tensorflow.
 
 The best performing model is the attention BLSTM that achieves a micro f-score of 0.67 on the test set.
 
@@ -16,9 +20,10 @@ Pretrained word embeddings can be used. The embeddings can either be GloVe or Wo
 
 1) In order to train your own model you must prepare your data set using the data_prep.py script. The preprocessing converts to lower case, tokenizes and removes very short words. The preprocessed files and label files should be saved in a /data folder.
 
-2) You can now run the classifier.py script that will build and train the model.
+2) You can now run classifier.py or hatt_classifier.py to build and train the models.
 
-3) The trained model is exported to json and the weights to h5 for later use.
+3) The trained models are exported to json and the weights to h5 for later use.
+
 
 ## Requirements
 
