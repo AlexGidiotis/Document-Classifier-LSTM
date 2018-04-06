@@ -9,10 +9,9 @@ import pandas as pd
 
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
-from keras.utils.np_utils import to_categorical
 from keras.layers.wrappers import Bidirectional
-from keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation, Convolution1D, MaxPooling1D, Flatten, concatenate, GlobalMaxPooling1D
-from keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D, SpatialDropout1D
+from keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation
+from keras.layers import SpatialDropout1D
 from keras.models import Model
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
@@ -29,6 +28,7 @@ from sklearn.metrics import f1_score
 
 from attention import AttentionWithContext
 from data_gen import Corpus
+
 
 # Modify this paths as well
 DATA_DIR = '/home/alex/Documents/git_projects/Document-Classifier-LSTM/data/'
@@ -68,8 +68,7 @@ def f1_score(y_true, y_pred):
 	return tf.reduce_mean(f_score)
 
 
-def load_data(train_set,
-	multilabel=True):
+def load_data(train_set):
 	"""
 	"""
 
@@ -120,14 +119,10 @@ def load_data(train_set,
 		json.dump(word_index, fp)
 	print 'Exported word dictionary'
 
+	mlb = MultiLabelBinarizer()
+	mlb.fit([class_dict.values()])
+	y_data = mlb.transform(y_data_int)
 
-	if multilabel:
-		mlb = MultiLabelBinarizer()
-		mlb.fit([class_dict.values()])
-		y_data = mlb.transform(y_data_int)
-	else:
-		y_data = to_categorical(y_data_int)
-		y_h_data = to_categorical(y_h_data_int)
 	print('Shape of label tensor:', y_data.shape)
 
 	X_train, X_val, y_train, y_val = train_test_split(X_data, y_data,
@@ -183,8 +178,7 @@ def build_model(nb_classes,
 	word_index,
 	embedding_dim,
 	seq_length,
-	stamp,
-	multilabel=True):
+	stamp):
 	"""
 	"""
 
@@ -217,32 +211,16 @@ def build_model(nb_classes,
 
 	drop3 = Dropout(0.5)(att_layer)
 	
+	predictions = Dense(nb_classes, activation='sigmoid')(drop3)
 
-	if multilabel:
-		predictions = Dense(nb_classes, activation='sigmoid')(drop3)
+	model = Model(inputs=input_layer, outputs=predictions)
 
-		model = Model(inputs=input_layer, outputs=predictions)
+	adam = Adam(lr=0.001,
+		decay=0.0)
 
-		adam = Adam(lr=0.001,
-			decay=0.0)
-
-		model.compile(loss='binary_crossentropy',
-			optimizer=adam,
-			metrics=[f1_score])
-
-
-	else:
-		predictions = Dense(nb_classes, activation='softmax')(drop3)
-
-		model = Model(inputs=input_layer, outputs=predictions)
-
-		adam = Adam(lr=0.001,
-			decay=0.0)
-
-		model.compile(loss='categorical_crossentropy',
-			optimizer=adam,
-			metrics=['accuracy'])
-
+	model.compile(loss='binary_crossentropy',
+		optimizer=adam,
+		metrics=[f1_score])
 
 	model.summary()
 	print(stamp)
@@ -257,8 +235,7 @@ def build_model(nb_classes,
 	return model
 
 
-def load_model(stamp,
-	multilabel=True):
+def load_model(stamp):
 	"""
 	"""
 
@@ -274,29 +251,19 @@ def load_model(stamp,
 
 
 	adam = Adam(lr=0.001)
-	if multilabel:
-		model.compile(loss='binary_crossentropy',
-			optimizer=adam,
-			metrics=[f1_score])
-	else:
-		model.compile(loss='categorical_crossentropy',
-			optimizer=adam,
-			metrics=['accuracy'])
+	model.compile(loss='binary_crossentropy',
+		optimizer=adam,
+		metrics=[f1_score])
+
 
 	return model
 
 
 if __name__ == '__main__':
 
-	multilabel,load_previous = sys.argv[1:]
+	load_previous = sys.argv[1]
 
-	print multilabel,load_previous
-
-	if multilabel == 'multi':
-		multilabel = True
-	else:
-		multilabel = False
-
+	print load_previous
 
 	if load_previous == 'load':
 		load_previous = True
@@ -306,24 +273,19 @@ if __name__ == '__main__':
 
 	train_set = Corpus(DATA_DIR+TRAIN_FILE,DATA_DIR+TRAIN_LABS)
 
-	X_train, X_val, y_train, y_val, nb_classes, word_index = load_data(train_set,
-		multilabel)
+	X_train, X_val, y_train, y_val, nb_classes, word_index = load_data(train_set)
 
 	if load_previous:
-		model = load_model(STAMP,
-			multilabel)
+		model = load_model(STAMP)
 	else:
 		model = build_model(nb_classes,
 			word_index,
 			EMBEDDING_DIM,
 			MAX_SEQUENCE_LENGTH,
-			STAMP,
-			multilabel)
+			STAMP)
 
-	if multilabel:
-		monitor_metric = 'val_f1_score'
-	else:
-		monitor_metric = 'val_loss'
+
+	monitor_metric = 'val_f1_score'
 
 	early_stopping =EarlyStopping(monitor=monitor_metric,
 		patience=5)
