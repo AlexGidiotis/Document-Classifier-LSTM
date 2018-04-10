@@ -242,7 +242,7 @@ def load_model(stamp):
 	json_file = open(stamp+'.json', 'r')
 	loaded_model_json = json_file.read()
 	json_file.close()
-	model = model_from_json(loaded_model_json)
+	model = model_from_json(loaded_model_json, {'AttentionWithContext': AttentionWithContext})
 
 	model.load_weights(stamp+'.h5')
 	print("Loaded model from disk")
