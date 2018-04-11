@@ -46,7 +46,7 @@ class AttentionWithContext(Layer):
                  W_constraint=None, u_constraint=None, b_constraint=None,
                  bias=True, **kwargs):
 
-        self.supports_masking = True
+
         self.init = initializers.get('glorot_uniform')
 
         self.W_regularizer = regularizers.get(W_regularizer)
@@ -85,12 +85,7 @@ class AttentionWithContext(Layer):
         super(AttentionWithContext, self).build(input_shape)
 
 
-    def compute_mask(self, input, input_mask=None):
-        # do not pass the mask to the next layers
-        return None
-
-
-    def call(self, x, mask=None):
+    def call(self, x):
         uit = dot_product(x, self.W)
 
         if self.bias:
@@ -98,19 +93,17 @@ class AttentionWithContext(Layer):
 
         uit = K.tanh(uit)
         ait = dot_product(uit, self.u)
-
+        '''
         a = K.exp(ait)
-
-        # apply mask after the exp. will be re-normalized next
-        if mask is not None:
-            # Cast the mask to floatX to avoid float64 upcasting in theano
-            a *= K.cast(mask, K.floatx())
 
         # in some cases especially in the early stages of training the sum may be almost zero
         # and this results in NaN's. A workaround is to add a very small positive number e to the sum.
         # a /= K.cast(K.sum(a, axis=1, keepdims=True), K.floatx())
         a /= K.cast(K.sum(a, axis=1, keepdims=True) + K.epsilon(), K.floatx())
 
+        a = K.expand_dims(a)
+        '''
+        a = K.softmax(ait)
         a = K.expand_dims(a)
         weighted_input = x * a
 
