@@ -93,16 +93,7 @@ class AttentionWithContext(Layer):
 
         uit = K.tanh(uit)
         ait = dot_product(uit, self.u)
-        '''
-        a = K.exp(ait)
 
-        # in some cases especially in the early stages of training the sum may be almost zero
-        # and this results in NaN's. A workaround is to add a very small positive number e to the sum.
-        # a /= K.cast(K.sum(a, axis=1, keepdims=True), K.floatx())
-        a /= K.cast(K.sum(a, axis=1, keepdims=True) + K.epsilon(), K.floatx())
-
-        a = K.expand_dims(a)
-        '''
         a = K.softmax(ait)
         a = K.expand_dims(a)
         weighted_input = x * a
