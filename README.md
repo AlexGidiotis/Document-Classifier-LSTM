@@ -24,6 +24,8 @@ Pretrained word embeddings can be used. The embeddings can either be GloVe or Wo
 
 3) The trained models are exported to json and the weights to h5 for later use.
 
+4) You can use utils.visualize_attention to visualize the attention weights.
+
 
 ## Requirements
 

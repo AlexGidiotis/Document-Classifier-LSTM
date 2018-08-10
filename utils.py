@@ -14,7 +14,7 @@ def visualize_attention(test_seq,
     Finally we obtain and print the words of the input sequence 
     that have these weights.
 
-    
+
     """
 
     get_layer_output = K.function([model.layers[0].input, K.learning_phase()], [model.layers[4].output])
@@ -32,7 +32,7 @@ def visualize_attention(test_seq,
     print ' '.join([id2wrd[wrd_id] for wrd_id in test_seq[0] if wrd_id != 0.]) 
     
     for k in test_seq[0][topKeys]:
-
-        print id2wrd[k]
+        if k != 0.:
+            print id2wrd[k]
     
     return
