@@ -16,12 +16,12 @@ def preprocess(text):
 	text = re.sub('\d+','#',text)
 	text = re.sub('\.',' eos ',text)
 	# Tokenize
-	words = map(lambda word: word.lower(), word_tokenize(text))
+	words = [word.lower() for word in word_tokenize(text)]
 	tokens = words
 	# Remove non characters
 	p = re.compile('[a-zA-Z#]+')
 	# Filter tokens (we do not remove stopwords)
-	filtered_tokens = list(filter(lambda token: p.match(token) and len(token)>=min_length and (token not in english_stopwords), tokens))
+	filtered_tokens = list([token for token in tokens if p.match(token) and len(token)>=min_length and (token not in english_stopwords)])
 	# Encode to ascii
 	filtered_tokens = [token.encode('ascii','ignore') for token in filtered_tokens]
 
@@ -48,8 +48,8 @@ df = df.sample(frac=1).reset_index(drop=True)
 # Split to train and test set.
 train_df = df[:int((1-test_split)*len(df))].reset_index(drop=True)
 test_df = df[int((1-test_split)*len(df)):].reset_index(drop=True)
-print train_df.shape[0],'training examples'
-print test_df.shape[0],'test examples'
+print(train_df.shape[0],'training examples')
+print(test_df.shape[0],'test examples')
 
 
 # Preprocess the data and labels for the train and test set.
@@ -60,7 +60,7 @@ for c,(abstr,labs) in enumerate(zip(train_df['abstract'].tolist(),train_df['cate
 	labs = labs.strip('[').strip(']').split(',')
 	labs = [lab.strip() for lab in labs]
 	y_train.append(labs)
-	if c % 10000 == 0: print c
+	if c % 10000 == 0: print(c)
 X_test = []
 y_test = []
 for c,(abstr,labs) in enumerate(zip(test_df['abstract'].tolist(),test_df['categories'].tolist())):
@@ -68,11 +68,11 @@ for c,(abstr,labs) in enumerate(zip(test_df['abstract'].tolist(),test_df['catego
 	labs = labs.strip('[').strip(']').split(',')
 	labs = [lab.strip() for lab in labs]
 	y_test.append(labs)
-	if c % 10000 == 0: print c
+	if c % 10000 == 0: print(c)
 
 
 # Write the outputs to .csv
-print 'Writting...'
+print('Writting...')
 with open("data/train_set.csv", "wb") as f:
     writer = csv.writer(f)
     writer.writerows(X_train)

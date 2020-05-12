@@ -84,10 +84,10 @@ def load_data(train_set,
 		X_data.append(vector)
 		y_data.append(target)
 		if c % 10000 == 0: 
-			print c
+			print(c)
 
 	num_texts = len(X_data)
-	print num_texts, 'training examples'
+	print(num_texts, 'training examples')
 
 	
 	tokenizer = Tokenizer(num_words=MAX_NB_WORDS,
@@ -118,26 +118,26 @@ def load_data(train_set,
 		X_data_int[idx,:,:] = sentences_batch
 
 	X_data = X_data_int
-	print('Shape of data tensor:', X_data.shape)
+	print(('Shape of data tensor:', X_data.shape))
 
 	
 	word_index = tokenizer.word_index
-	print('Found %s unique tokens' % len(word_index))
+	print(('Found %s unique tokens' % len(word_index)))
 	with open('word_index.json', 'w') as fp:
 		json.dump(word_index, fp)
-	print 'Exported word dictionary'
+	print('Exported word dictionary')
 
 
 	class_freqs = Counter([y for y_seq in y_data for y in y_seq]).most_common()
 
 	class_list = [y[0] for y in class_freqs]
 	nb_classes = len(class_list)
-	print nb_classes,'classes'
-	class_dict = dict(zip(class_list, np.arange(len(class_list))))
+	print(nb_classes,'classes')
+	class_dict = dict(list(zip(class_list, np.arange(len(class_list)))))
 
 	with open('class_dict.json', 'w') as fp:
 		json.dump(class_dict, fp)
-	print 'Exported class dictionary'
+	print('Exported class dictionary')
 
 
 	y_data_int = []
@@ -147,12 +147,12 @@ def load_data(train_set,
 
 	if multilabel:
 		mlb = MultiLabelBinarizer()
-		mlb.fit([class_dict.values()])
+		mlb.fit([list(class_dict.values())])
 		y_data = mlb.transform(y_data_int)
 	else:
 		y_data = to_categorical(y_data_int)
 		y_h_data = to_categorical(y_h_data_int)
-	print('Shape of label tensor:', y_data.shape)
+	print(('Shape of label tensor:', y_data.shape))
 
 	X_train, X_val, y_train, y_val = train_test_split(X_data, y_data,
 		train_size=0.8,
@@ -167,7 +167,7 @@ def prepare_embeddings(wrd2id):
 	"""
 
 	vocab_size = MAX_NB_WORDS
-	print "Found %s words in the vocabulary." % vocab_size
+	print("Found %s words in the vocabulary." % vocab_size)
 
 
 	embedding_idx = {}
@@ -179,14 +179,14 @@ def prepare_embeddings(wrd2id):
 			dtype='float32')
 		embedding_idx[wrd] = coefs
 	glove_f.close()
-	print "Found %s word vectors." % len(embedding_idx)
+	print("Found %s word vectors." % len(embedding_idx))
 
 
 	embedding_mat = np.random.rand(vocab_size+1,EMBEDDING_DIM)
 
 	wrds_with_embeddings = 0
 	# Keep the MAX_NB_WORDS most frequent tokens.
-	for wrd, i in wrd2id.items():
+	for wrd, i in list(wrd2id.items()):
 		if i > vocab_size:
 			continue
 
@@ -197,8 +197,8 @@ def prepare_embeddings(wrd2id):
 			embedding_mat[i] = embedding_vec
 
 
-	print embedding_mat.shape
-	print 'Words with embeddings:',wrds_with_embeddings
+	print(embedding_mat.shape)
+	print('Words with embeddings:',wrds_with_embeddings)
 
 	return embedding_mat, vocab_size
 
@@ -335,7 +335,7 @@ if __name__ == '__main__':
 
 	multilabel,load_previous = sys.argv[1:]
 
-	print multilabel,load_previous
+	print(multilabel,load_previous)
 
 	if multilabel == 'multi':
 		multilabel = True
@@ -387,4 +387,4 @@ if __name__ == '__main__':
 		shuffle=True,
 		callbacks=[model_checkpoint])
 
-	print hist.history
+	print(hist.history)

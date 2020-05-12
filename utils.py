@@ -29,10 +29,10 @@ def visualize_attention(test_seq,
 
     topKeys = np.argpartition(weights,-n)[-n:]
 
-    print ' '.join([id2wrd[wrd_id] for wrd_id in test_seq[0] if wrd_id != 0.]) 
+    print(' '.join([id2wrd[wrd_id] for wrd_id in test_seq[0] if wrd_id != 0.])) 
     
     for k in test_seq[0][topKeys]:
         if k != 0.:
-            print id2wrd[k]
+            print(id2wrd[k])
     
     return
