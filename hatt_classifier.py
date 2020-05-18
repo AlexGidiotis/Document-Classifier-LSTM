@@ -133,7 +133,7 @@ def load_data(train_set,
 	class_list = [y[0] for y in class_freqs]
 	nb_classes = len(class_list)
 	print(nb_classes,'classes')
-	class_dict = dict(list(zip(class_list, np.arange(len(class_list)))))
+	class_dict = dict(zip(class_list, np.arange(len(class_list))))
 
 	with open('class_dict.json', 'w') as fp:
 		json.dump(class_dict, fp)
@@ -186,7 +186,7 @@ def prepare_embeddings(wrd2id):
 
 	wrds_with_embeddings = 0
 	# Keep the MAX_NB_WORDS most frequent tokens.
-	for wrd, i in list(wrd2id.items()):
+	for wrd, i in wrd2id.items():
 		if i > vocab_size:
 			continue
 
