@@ -2,7 +2,7 @@ h5py==2.7.1
 nltk==3.6.6
 pandas==0.19.1
 scipy==1.10.0
-Keras==2.1.4
+Keras==2.13.1
 numpy==1.22.0
 opencv-python==4.2.0.32
 scikit-learn==0.19.1
